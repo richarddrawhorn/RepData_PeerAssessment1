@@ -1,0 +1,106 @@
+---
+title: "Reproducible Research Course Project 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+###Load data:
+```{r read data}
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(ggplot2))
+data <- read.csv("activity.csv", header=TRUE)
+data <- tbl_df(data)
+```
+
+###What is mean total number of steps taken per day?
+```{r plot1 stats, echo=TRUE}
+#total steps per day
+total_steps <- summarise(group_by(data, date), total=sum(steps, na.rm=TRUE))
+#mean and median of total steps per day
+total_steps_mean <- mean(total_steps$total)
+total_steps_med <- median(total_steps$total)
+```
+Statistics for the total number of steps per day:
+the mean is `r total_steps_mean`, 
+and the median is `r total_steps_med`. 
+``` {r plot1, echo=TRUE}
+#histogram of total steps per day
+p1 <- ggplot(total_steps, aes(x = total))
+print(p1  + geom_histogram(binwidth=60))
+```
+
+###What is the average daily activity pattern?
+``` {r plot2 stats, echo=TRUE}
+#find interval with maximum number of steps
+data <- arrange(data, desc(steps))
+maxint <- as.numeric(data[1,3])
+```
+The interval with the maximum number of steps is `r maxint`. 
+
+``` {r plot2, echo=TRUE}
+#time series plot of interval vs. steps
+p2 <- ggplot(data, aes(x=interval, y=steps))
+print(p2 + geom_line())
+
+```
+
+###Imputing missing values
+``` {r plot3 num1, echo=TRUE}
+#calculate number of NA values in dataset
+na_steps <- select(filter(data, is.na(steps)), -date)
+num_na <- length(na_steps$steps) 
+```
+The number of missing values in the dataset is `r num_na`. 
+
+``` {r plot3 num3, echo=TRUE}
+#subset the dataset to exclude missing values
+good_steps <- filter(data, !is.na(steps))
+#calculate average number of steps per interval
+mean_steps <- summarise(group_by(good_steps, interval), steps=mean(steps, na.rm=TRUE))
+#replace NA values in dataset with average number of steps per interval
+for(i in 1:nrow(data)) {
+        if (is.na(data[i,1])) {
+                data[i,1] <- select(filter(mean_steps, interval==as.numeric(data[i,3])), steps)
+        }
+}
+#summarise by total steps per day
+total_steps2 <- summarise(group_by(data, date), total=sum(steps))
+#calculate the mean and median of the total steps per day
+total_steps_mean2 <- mean(total_steps2$total)
+total_steps_med2 <- median(total_steps2$total)
+```
+Statistics for total steps per day: the mean is `r total_steps_mean2` and the median is `r total_steps_med2`. The impact of imputing missing values is the mean and median are both larger than those calculated in the first part of the assignment, and are now identical. 
+
+``` {r plot3 num4, echo=TRUE}
+#histogram of total steps per day
+p3 <- ggplot(total_steps2, aes(x = total))
+print(p3  + geom_histogram(binwidth=60))
+```
+
+###Are there differences in activity patterns between weekdays and weekends?
+``` {r plot4 stats}
+#convert date factor to type date
+data$date <- as.Date(data$date)
+#add a new column for weekday
+data <- mutate(data, day=weekdays(date))
+for(i in 1:nrow(data)) {
+        if (data[i,4]=="Saturday") {
+                data[i,4] <- "Weekend"
+        } else if (data[i,4]=="Sunday") {
+                data[i,4] <- "Weekend"
+        } else {data[i,4] <- "Weekday"}
+}
+#convert day to factor
+data$day <- as.factor(data$day)
+#make a panel plot of interval vs steps across weekdays and weekends
+p4 <- ggplot(data, aes(interval, steps)) + geom_line()
+print(p4 + facet_grid(day ~ .))
+```
+
+
+
